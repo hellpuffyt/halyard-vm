@@ -242,8 +242,10 @@ impl Program {
             ));
         }
         let code = b[16..16 + ncode * 8]
-            .chunks_exact(8)
-            .map(|c| Instr::from_bytes(c.try_into().unwrap()))
+            .as_chunks::<8>()
+            .0
+            .iter()
+            .map(|c| Instr::from_bytes(*c))
             .collect();
         Ok(Program {
             code,
@@ -682,7 +684,7 @@ impl Vm {
             feed(&c.to_le_bytes());
         }
         feed(&(self.heap as u64).to_le_bytes());
-        feed(&self.handler.map_or(u32::MAX, |h| h).to_le_bytes());
+        feed(&self.handler.unwrap_or(u32::MAX).to_le_bytes());
         feed(&self.gas_used.to_le_bytes());
         feed(&self.rng.to_le_bytes());
         h
@@ -702,7 +704,7 @@ impl Vm {
         }
         b.extend_from_slice(&self.pc.to_le_bytes());
         b.extend_from_slice(&(self.heap as u64).to_le_bytes());
-        b.extend_from_slice(&self.handler.map_or(u32::MAX, |h| h).to_le_bytes());
+        b.extend_from_slice(&self.handler.unwrap_or(u32::MAX).to_le_bytes());
         b.extend_from_slice(&self.gas_used.to_le_bytes());
         b.extend_from_slice(&self.rng.to_le_bytes());
         b.push(match self.status {
@@ -783,12 +785,16 @@ impl Vm {
         };
         self.mem = mem;
         self.stack = stack
-            .chunks_exact(8)
-            .map(|c| i64::from_le_bytes(c.try_into().unwrap()))
+            .as_chunks::<8>()
+            .0
+            .iter()
+            .map(|c| i64::from_le_bytes(*c))
             .collect();
         self.calls = calls
-            .chunks_exact(4)
-            .map(|c| u32::from_le_bytes(c.try_into().unwrap()))
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|c| u32::from_le_bytes(*c))
             .collect();
         self.output = output;
         self.events = events;
