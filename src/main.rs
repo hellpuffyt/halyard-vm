@@ -220,7 +220,9 @@ fn debug(prog: Program, opts: Opts) -> i32 {
         }
     }
     let st = vm.status;
-    report(&vm, st, false)
+    let code = report(&vm, st, false);
+    // Quitting the debugger mid-program is not a program failure.
+    if st == Status::Running { 0 } else { code }
 }
 
 fn main() {
