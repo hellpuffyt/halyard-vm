@@ -1,0 +1,7 @@
+; Hello, world. Run: halyard run examples/hello.hasm
+.data greeting "Hello from Halyard\n"
+
+  movi r1, greeting
+  movi r2, 19
+  sys write
+  halt

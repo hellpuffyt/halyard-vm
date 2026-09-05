@@ -1,0 +1,43 @@
+; Untrusted code that misbehaves in three ways, and what the sandbox does:
+;   1. tries to read outside memory      -> MEM_OOB trap, caught by the handler
+;   2. tries a syscall it lacks           -> CAP_DENIED trap, caught
+;   3. spins forever                      -> stopped by the gas limit, exit code 3
+; Run: halyard run examples/guarded.hasm --gas 5000
+.data msg1 "caught trap "
+.data msg2 "\n"
+.data buf 4
+
+  seth handler
+  movi r1, -8
+  ld r2, r1, 0           ; (1) out of bounds
+after1:
+  seth handler
+  movi r1, 0
+  movi r2, 1
+  sys emit               ; (2) no Cap::Emit by default
+after2:
+spin:
+  addi r9, r9, 1
+  jmp spin               ; (3) never halts; gas ends it
+
+handler:
+  ; r0 = trap code; print "caught trap N\n" and continue after the faulting site
+  push r0
+  movi r1, msg1
+  movi r2, 12
+  sys write
+  pop r0
+  movi r3, buf
+  addi r0, r0, '0'
+  stb r0, r3, 0
+  movi r1, buf
+  movi r2, 1
+  sys write
+  movi r1, msg2
+  movi r2, 1
+  sys write
+  ; crude resume: first trap resumes at after1, second at after2
+  addi r10, r10, 1
+  movi r11, 1
+  jeq r10, r11, after1
+  jmp after2

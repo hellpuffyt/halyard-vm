@@ -1,0 +1,45 @@
+; Recursive Fibonacci with a proper call convention:
+;   argument in r1, result in r0, caller-saved r1/r2 preserved on the data stack.
+; Run: halyard run examples/fib.hasm --hash
+; Prints fib(25) as decimal text, then the state hash is identical on every machine.
+.data buf 32
+
+  movi r1, 25
+  call fib
+  ; --- itoa: write r0 as decimal into buf (right to left) ---
+  movi r3, buf
+  addi r3, r3, 31        ; r3 = end of buffer
+  movi r4, 10
+  stb r4, r3, 0          ; trailing newline
+  mov r5, r0
+digits:
+  addi r3, r3, -1
+  mod r6, r5, r4
+  addi r6, r6, '0'
+  stb r6, r3, 0
+  div r5, r5, r4
+  jnz r5, digits
+  ; write from r3 to buf+32
+  mov r1, r3
+  movi r2, buf
+  addi r2, r2, 32
+  sub r2, r2, r3
+  sys write
+  halt
+
+fib:
+  movi r2, 2
+  jlt r1, r2, base
+  push r1
+  addi r1, r1, -1
+  call fib
+  pop r1
+  push r0
+  addi r1, r1, -2
+  call fib
+  pop r2
+  add r0, r0, r2
+  ret
+base:
+  mov r0, r1
+  ret

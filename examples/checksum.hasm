@@ -1,0 +1,61 @@
+; A workflow step: read host-provided input, compute FNV-1a-32 over it,
+; emit the checksum as an event the orchestrator can pick up, and return it in r0.
+; Run: halyard run examples/checksum.hasm --input README.md --cap input,emit,output
+;      (for input "abc" the answer is 1a47e90b)
+.data buf 4096
+.data out 16
+
+  movi r1, buf
+  movi r2, 4096
+  sys read               ; r0 = bytes copied
+  mov r3, r0             ; r3 = len
+  ; r4 = 0x811c9dc5 (FNV offset basis) — immediates are signed 32-bit, so build it
+  movi r4, 0x811c
+  movi r13, 16
+  shl r4, r4, r13
+  movi r13, 0x9dc5
+  or r4, r4, r13
+  movi r5, 0             ; i
+  movi r6, buf
+  movi r8, -1
+  movi r13, 32
+  shr r8, r8, r13        ; r8 = 0xffffffff
+loop:
+  jge r5, r3, done
+  add r7, r6, r5
+  ldb r7, r7, 0
+  xor r4, r4, r7
+  muli r4, r4, 16777619  ; FNV prime
+  and r4, r4, r8         ; keep 32 bits
+  addi r5, r5, 1
+  jmp loop
+done:
+  mov r0, r4
+  ; render as 8 hex digits into out
+  movi r9, out
+  addi r9, r9, 8
+  movi r10, 10
+  stb r10, r9, 0
+  movi r11, 8
+hex:
+  addi r9, r9, -1
+  movi r12, 15
+  and r12, r4, r12
+  movi r13, 10
+  jlt r12, r13, digit
+  addi r12, r12, 'a'
+  addi r12, r12, -10
+  jmp put
+digit:
+  addi r12, r12, '0'
+put:
+  stb r12, r9, 0
+  movi r13, 4
+  shr r4, r4, r13
+  addi r11, r11, -1
+  jnz r11, hex
+  movi r1, out
+  movi r2, 9
+  sys emit               ; event: "<hex>\n"
+  sys write              ; also print it
+  halt

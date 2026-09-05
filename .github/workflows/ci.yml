@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --all-targets
+      - run: cargo test --release
+      - name: Real execution — programs through the CLI
+        shell: bash
+        run: |
+          H=./target/release/halyard
+          $H asm examples/fib.hasm -o "$RUNNER_TEMP/fib.hy"
+          test "$($H run "$RUNNER_TEMP/fib.hy" 2>/dev/null)" = "75025"
+          $H run examples/fib.hasm --hash 2>/dev/null | grep -q "state hash: b139eb51d3d172a3"
+          printf 'abc' > "$RUNNER_TEMP/in.txt"
+          test "$($H run examples/checksum.hasm --input "$RUNNER_TEMP/in.txt" --cap input,emit,output 2>/dev/null)" = "1a47e90b"
+          set +e; out=$($H run examples/guarded.hasm --gas 5000 2>/dev/null); code=$?; set -e
+          test "$code" = "3"
+          echo "$out" | grep -q "caught trap 2"
+          echo "$out" | grep -q "caught trap 7"
+          $H dis "$RUNNER_TEMP/fib.hy" | grep -q "call 19"
+          printf 's 2\nr\nq\n' | $H debug examples/hello.hasm | grep -q "pc=2"
+      - run: cargo run --release --example embed
+      - run: cargo run --release --example bench
+
+  lint:
+    name: fmt, clippy, unsafe, audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - name: No unsafe, no dependencies, no nondeterminism sources
+        run: |
+          ! grep -rn "unsafe" src/
+          ! grep -n "std::time\|SystemTime\|Instant" src/lib.rs src/asm.rs
+          test "$(grep -c '^\[\[package\]\]' Cargo.lock)" = "1"
+      - run: cargo install cargo-audit --locked && cargo audit
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

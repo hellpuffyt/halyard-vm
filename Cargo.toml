@@ -1,0 +1,20 @@
+[package]
+name = "halyard"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+description = "Deterministic, gas-metered, capability-gated register VM for running untrusted automation. Snapshot/resume, traps, assembler, debugger. Zero dependencies."
+license = "MIT"
+repository = "https://github.com/hellpuffyt/halyard-vm"
+keywords = ["vm", "sandbox", "deterministic", "bytecode", "interpreter"]
+categories = ["emulators", "virtualization"]
+
+[[bin]]
+name = "halyard"
+path = "src/main.rs"
+
+[dependencies]
+
+[profile.release]
+lto = true
+codegen-units = 1
