@@ -51,9 +51,12 @@ jobs:
       - run: cargo fmt --all -- --check
       - run: cargo clippy --all-targets -- -D warnings
       - name: No unsafe, no dependencies, no nondeterminism sources
+        # `! cmd` never trips `bash -e`, so the old `! grep` lines could not
+        # fail the step. Unsafe is now forbidden by the compiler.
         run: |
-          ! grep -rn "unsafe" src/
-          ! grep -n "std::time\|SystemTime\|Instant" src/lib.rs src/asm.rs
+          grep -qx '#!\[forbid(unsafe_code)\]' src/lib.rs
+          grep -qx '#!\[forbid(unsafe_code)\]' src/main.rs
+          if grep -n "std::time\|SystemTime\|Instant" src/lib.rs src/asm.rs; then exit 1; fi
           test "$(grep -c '^\[\[package\]\]' Cargo.lock)" = "1"
       - run: cargo install cargo-audit --locked && cargo audit
       - uses: gitleaks/gitleaks-action@v2
