@@ -19,6 +19,8 @@
 //! assert_eq!(vm.regs[0], 42);
 //! ```
 
+#![forbid(unsafe_code)]
+
 pub mod asm;
 
 use std::collections::HashMap;
@@ -764,12 +766,29 @@ impl Vm {
         let calls = blob(&mut pos)?;
         let output = blob(&mut pos)?;
         let n_events = u32::from_le_bytes(take(&mut pos, 4)?.try_into().unwrap()) as usize;
-        let mut events = Vec::with_capacity(n_events);
+        // The count is untrusted: every event needs at least its 4-byte
+        // length prefix, so never reserve more than the bytes left allow.
+        let mut events = Vec::with_capacity(n_events.min(snap.len().saturating_sub(pos) / 4));
         for _ in 0..n_events {
             events.push(blob(&mut pos)?);
         }
-        if pc as usize > self.code.len() || heap > mem.len() {
+        if pos != snap.len() {
+            return Err("trailing bytes after snapshot".into());
+        }
+        if st > 3 {
+            return Err(format!("unknown status {st} in snapshot"));
+        }
+        if stack.len() % 8 != 0 || calls.len() % 4 != 0 {
+            return Err("malformed stack in snapshot".into());
+        }
+        if pc as usize > self.code.len()
+            || heap > mem.len()
+            || (handler != u32::MAX && handler as usize >= self.code.len())
+        {
             return Err("snapshot does not match this program".into());
+        }
+        if stack.len() / 8 > self.max_stack || calls.len() / 4 > self.max_call_depth {
+            return Err("snapshot exceeds this VM's stack limits".into());
         }
         self.regs = regs;
         self.pc = pc;

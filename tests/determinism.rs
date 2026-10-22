@@ -101,3 +101,54 @@ fn corrupt_program_files_are_rejected() {
         "size overflow is an error, not a panic"
     );
 }
+
+/// Regression: `restore` accepted snapshots whose stacks were not a whole
+/// number of entries (silently dropping bytes), exceeded the VM's stack
+/// limits, named a handler outside the code, had unknown status bytes, or
+/// carried trailing garbage.
+#[test]
+fn inconsistent_snapshots_are_rejected() {
+    let p = asm::assemble(PROG).unwrap();
+    let mut vm = Vm::new(&p, Config::default());
+    vm.run(50);
+    let good = vm.snapshot();
+    let fresh_vm = || Vm::new(&p, Config::default());
+    assert!(fresh_vm().restore(&good).is_ok());
+
+    let mut trailing = good.clone();
+    trailing.push(0);
+    assert!(fresh_vm().restore(&trailing).is_err(), "trailing byte");
+
+    // Layout: magic(4) regs(128) pc(4) heap(8) handler(4) gas(8) rng(8) status(1) code(8)
+    let handler_at = 4 + 128 + 4 + 8;
+    let status_at = handler_at + 4 + 8 + 8;
+    let mut bad_handler = good.clone();
+    bad_handler[handler_at..handler_at + 4].copy_from_slice(&1_000_000u32.to_le_bytes());
+    assert!(
+        fresh_vm().restore(&bad_handler).is_err(),
+        "handler past code"
+    );
+
+    let mut bad_status = good.clone();
+    bad_status[status_at] = 9;
+    assert!(fresh_vm().restore(&bad_status).is_err(), "unknown status");
+
+    // Rebuild a snapshot with a ragged stack blob (7 bytes).
+    let mem_len_at = status_at + 1 + 8;
+    let mem_len = u32::from_le_bytes(good[mem_len_at..mem_len_at + 4].try_into().unwrap()) as usize;
+    let stack_at = mem_len_at + 4 + mem_len;
+    let old_stack = u32::from_le_bytes(good[stack_at..stack_at + 4].try_into().unwrap()) as usize;
+    let mut ragged = good[..stack_at].to_vec();
+    ragged.extend_from_slice(&7u32.to_le_bytes());
+    ragged.extend_from_slice(&[0; 7]);
+    ragged.extend_from_slice(&good[stack_at + 4 + old_stack..]);
+    assert!(fresh_vm().restore(&ragged).is_err(), "ragged stack");
+
+    // A stack deeper than this VM allows.
+    let mut deep = good[..stack_at].to_vec();
+    let entries = Config::default().max_stack + 1;
+    deep.extend_from_slice(&((entries * 8) as u32).to_le_bytes());
+    deep.extend_from_slice(&vec![0; entries * 8]);
+    deep.extend_from_slice(&good[stack_at + 4 + old_stack..]);
+    assert!(fresh_vm().restore(&deep).is_err(), "stack over limit");
+}
