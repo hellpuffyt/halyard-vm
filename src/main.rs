@@ -7,6 +7,8 @@
 //! halyard debug prog.hy|prog.hasm      interactive: s[tep] [n], c[ontinue], r[egs], m[em] addr len, b[reak] pc, d[is], q[uit]
 //! ```
 
+#![forbid(unsafe_code)]
+
 use std::io::{BufRead, Write};
 
 use halyard::{Cap, Config, Program, Status, Vm, asm};
@@ -175,7 +177,7 @@ fn debug(prog: Program, opts: Opts) -> i32 {
             "m" | "mem" => {
                 let a: usize = parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
                 let n: usize = parts.get(2).and_then(|s| s.parse().ok()).unwrap_or(64);
-                let end = (a + n).min(vm.mem.len());
+                let end = a.saturating_add(n).min(vm.mem.len());
                 for (off, chunk) in vm.mem[a.min(end)..end].chunks(16).enumerate() {
                     let hex: Vec<String> = chunk.iter().map(|b| format!("{b:02x}")).collect();
                     let txt: String = chunk
@@ -188,7 +190,7 @@ fn debug(prog: Program, opts: Opts) -> i32 {
                             }
                         })
                         .collect();
-                    println!("{:06x}  {:<48} {txt}", a + off * 16, hex.join(" "));
+                    println!("{:06x}  {:<48} {txt}", a.min(end) + off * 16, hex.join(" "));
                 }
             }
             "b" | "break" => match parts.get(1).and_then(|s| s.parse::<u32>().ok()) {
@@ -263,9 +265,10 @@ fn main() {
             let opts = parse_opts(&args[2..]);
             let prog = load(file);
             let hash = opts.hash;
+            let trace = opts.cfg.trace;
             let mut vm = Vm::new(&prog, opts.cfg);
             let st = vm.run(opts.gas);
-            if opts.gas > 0 && std::env::var_os("HALYARD_TRACE").is_some() {
+            if trace {
                 eprintln!("trace: {:?}", vm.trace);
             }
             report(&vm, st, hash)
