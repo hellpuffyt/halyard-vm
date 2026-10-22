@@ -108,6 +108,7 @@ host, resumable with `resume(gas)`.
 .data name "string with \n \t \0 \\ \" \xNN escapes"   ; bytes; label = address
 .data name 64                                          ; 64 zero bytes
 .word name 12345                                       ; 8-byte little-endian
+; the whole data segment is limited to 16 MiB (asm::MAX_DATA_BYTES)
 label:                                                 ; instruction index
   mnemonic operand, operand, operand
 ```

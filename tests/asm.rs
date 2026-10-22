@@ -89,3 +89,22 @@ fn binary_encoding_is_stable() {
     assert_eq!(b.len(), 16 + 8 + 3);
     assert_eq!(Program::from_bytes(&b).unwrap(), p);
 }
+
+/// Regression: a huge `.data` reservation made the assembler request an
+/// impossible allocation (capacity overflow panic / allocation abort) instead
+/// of reporting an error.
+#[test]
+fn oversized_data_segment_is_an_error_not_an_abort() {
+    for src in [
+        "main:\n  halt\n.data buf 9223372036854775807",
+        ".data a 16000000\n.data b 16000000\nhalt",
+    ] {
+        let e = asm::assemble(src).unwrap_err();
+        assert!(e.msg.contains("data segment would exceed"), "{e:?}");
+    }
+    let at_limit = format!(".data buf {}\nhalt", asm::MAX_DATA_BYTES);
+    assert_eq!(
+        asm::assemble(&at_limit).unwrap().data.len(),
+        asm::MAX_DATA_BYTES
+    );
+}
