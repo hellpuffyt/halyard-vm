@@ -5,6 +5,21 @@ Program-file and snapshot format changes are called out explicitly.
 
 ## [Unreleased]
 
+### Fixed
+- `Vm::restore` reserved memory from an untrusted 32-bit event count
+  (~100 GB request from a 4-byte edit); it now never reserves more than the
+  snapshot's remaining bytes justify.
+- `Vm::restore` accepted ragged stack blobs, stacks deeper than the VM's
+  limits, handlers outside the code, unknown status bytes and trailing
+  bytes; all are now rejected.
+- The assembler aborted the process on huge `.data` reservations; the data
+  segment is now capped at 16 MiB with a line-numbered error.
+- `halyard run --trace` did not print the trace unless an undocumented
+  environment variable was set.
+- Debugger `m A N` overflowed (panic in debug builds) for huge addresses.
+- CI "No unsafe / no nondeterminism" step could never fail (`! grep` is
+  exempt from `bash -e`); `#![forbid(unsafe_code)]` now enforces the first.
+
 ## [0.1.0] — 2026-09-06
 
 First release. Program format v1, snapshot format `HSNP`.
