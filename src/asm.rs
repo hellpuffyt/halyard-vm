@@ -22,6 +22,11 @@ use std::collections::HashMap;
 
 use crate::{Instr, Op, Program, sys};
 
+/// Largest data segment the assembler will build (16 MiB). Without a bound a
+/// one-line `.data buf 9223372036854775807` made the host try to allocate
+/// exabytes and abort; the binary format also stores lengths as `u32`.
+pub const MAX_DATA_BYTES: usize = 16 << 20;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AsmError {
     pub line: usize,
@@ -158,9 +163,19 @@ pub fn assemble(src: &str) -> Result<Program, AsmError> {
                 if n < 0 {
                     return err(ln, "negative reservation");
                 }
-                data.resize(data.len() + n as usize, 0);
+                let new_len = usize::try_from(n)
+                    .ok()
+                    .and_then(|n| data.len().checked_add(n))
+                    .filter(|&l| l <= MAX_DATA_BYTES);
+                match new_len {
+                    Some(l) => data.resize(l, 0),
+                    None => return err(ln, data_too_large()),
+                }
             } else {
                 return err(ln, format!("bad .data value {value}"));
+            }
+            if data.len() > MAX_DATA_BYTES {
+                return err(ln, data_too_large());
             }
             continue;
         }
@@ -244,6 +259,10 @@ pub fn assemble(src: &str) -> Result<Program, AsmError> {
         out.push(ins);
     }
     Ok(Program { code: out, data })
+}
+
+fn data_too_large() -> String {
+    format!("data segment would exceed {MAX_DATA_BYTES} bytes")
 }
 
 fn parse_reg(s: &str) -> Option<u8> {

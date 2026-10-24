@@ -85,7 +85,10 @@ with line-numbered errors and a real debugger, not a `println!` loop.
 
 ## Benchmarks
 
-`cargo run --release --example bench`, Windows 11 laptop, one run:
+`cargo run --release --example bench`, Windows 11 laptop, one run (not
+re-measured in the 2026-10 audit; a run on a shared Apple-silicon Mac gave
+lower figures, e.g. ≈ 280 M instr/s for the tight loop, so treat the table as
+one machine's result, not a guarantee):
 
 | Workload | Throughput |
 |---|---|
@@ -104,13 +107,14 @@ will hit.
 
 ```
 cargo build --release              # target/release/halyard
-cargo test                         # 28 tests: ISA, sandbox, determinism, assembler
+cargo test                         # 35 tests + 1 doc test: ISA, sandbox, determinism, assembler, CLI
 cargo run --release --example bench
 cargo run --example embed          # host function + capability demo
 
 halyard asm  examples/fib.hasm -o fib.hy
 halyard dis  fib.hy
 halyard run  fib.hy --gas 5000000 --hash
+halyard run  examples/hello.hasm --trace    # prints the executed pcs to stderr
 halyard run  examples/checksum.hasm --input README.md --cap input,emit,output
 halyard debug examples/fib.hasm    # s, c, r, m, b, d, st, hash, q
 ```

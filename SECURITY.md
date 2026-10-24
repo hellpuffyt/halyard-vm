@@ -12,9 +12,10 @@ Halyard is a sandbox. This document says exactly what that means.
 | A program cannot exhaust host memory | Fixed arena; `alloc` traps with `OOM`; stacks have hard caps | `isa::heap_allocation`, `sandbox::stack_and_call_depth_are_bounded` |
 | A program cannot reach the host without permission | Each boundary syscall checks a `Cap`; host functions need `Cap::Host(id)` *and* registration | `sandbox::capabilities_gate_syscalls`, `host_functions_need_registration_and_capability` |
 | A host error cannot crash the VM | `Err` from a host closure becomes `HOST_ERROR` trap | same |
-| Malformed programs and snapshots cannot crash the loader | Length/overflow-checked decoding | `determinism::corrupt_program_files_are_rejected`, `snapshot_survives_…` |
+| Malformed programs and snapshots cannot crash the loader | Length/overflow-checked decoding; snapshot counts never drive allocations beyond the input size; stacks, handler, status and trailing bytes are validated against the VM | `determinism::corrupt_program_files_are_rejected`, `determinism::inconsistent_snapshots_are_rejected`, `alloc_bounds::*` |
+| Hostile assembly source cannot crash the assembler | Data segment capped at 16 MiB (`asm::MAX_DATA_BYTES`) | `asm::oversized_data_segment_is_an_error_not_an_abort` |
 | Behaviour is reproducible | No time, no OS randomness, no threads; `state_hash` | `determinism::*` |
-| No memory-unsafety in the VM itself | 100% safe Rust, zero `unsafe`, zero dependencies | CI grep |
+| No memory-unsafety in the VM itself | 100% safe Rust (`#![forbid(unsafe_code)]`), zero dependencies | compiler-enforced; CI checks the attribute |
 
 ## Non-guarantees
 
@@ -30,11 +31,16 @@ Halyard is a sandbox. This document says exactly what that means.
   by gas × 10 bytes per syscall at most 64 KiB each. If you run with a very
   large gas budget, cap `output.len()` yourself between `run` calls or lower
   the budget.
+- **The program's data segment sets a floor on the arena.** `Vm::new`
+  allocates `max(memory_size, program.data.len())`. The data bytes are part
+  of the program the host already holds, so this is proportional to input
+  size, but check `program.data.len()` before loading programs from
+  untrusted sources if that matters to you.
 - **Snapshots are not authenticated.** A tampered snapshot restores to a
   tampered state. Sign them if they cross a trust boundary.
 
 ## Reporting
 
-Open a security advisory on the GitHub repository or email the maintainer in
-`Cargo.toml`. Include a `.hasm` reproducer where possible. Acknowledgement
+Open a private security advisory at
+https://github.com/hellpuffyt/halyard-vm/security/advisories/new. Include a `.hasm` reproducer where possible. Acknowledgement
 within 7 days; only the latest 0.x release receives fixes.
