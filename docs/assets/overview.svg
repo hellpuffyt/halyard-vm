@@ -1,0 +1,153 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="500" viewBox="0 0 1200 500" role="img" aria-labelledby="t d">
+  <title id="t">Halyard VM architecture</title>
+  <desc id="d">Assembly text is assembled by asm::assemble into a Program (code plus data, HLYD file format). Vm::new loads it with a Config. The step loop decodes each 8-byte Instr, charges gas and executes it against sixteen i64 registers, flat memory, a data stack and a call stack. Syscalls leave the sandbox only through capability checks; faults raise trap codes to a seth handler or stop the VM. run and resume return Halted, OutOfGas or Trapped. snapshot, restore and state_hash serialise and fingerprint the whole machine.</desc>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A3AAA6"/>
+    </marker>
+    <marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3FBF8A"/>
+    </marker>
+  </defs>
+  <rect width="1200" height="500" fill="#0C0D0D"/>
+
+  <g font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="11" fill="#A3AAA6">
+    <text x="40" y="38" letter-spacing="2">LOAD</text>
+    <text x="330" y="38" letter-spacing="2">EXECUTE  (src/lib.rs)</text>
+    <text x="900" y="38" letter-spacing="2">SANDBOX BOUNDARY</text>
+  </g>
+
+  <!-- LOAD column -->
+  <g font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace">
+    <rect x="40" y="56" width="230" height="56" rx="6" fill="#17191A" stroke="#2A2E2D"/>
+    <text x="56" y="80" font-size="14" fill="#EEEAE2">.hasm source</text>
+    <text x="56" y="99" font-size="11" fill="#A3AAA6">labels · .data · 'c' literals</text>
+
+    <rect x="40" y="140" width="230" height="64" rx="6" fill="#17191A" stroke="#2A2E2D"/>
+    <text x="56" y="164" font-size="14" fill="#EEEAE2">asm::assemble</text>
+    <text x="56" y="183" font-size="11" fill="#A3AAA6">two-pass: labels, fix-ups</text>
+    <text x="56" y="197" font-size="11" fill="#A3AAA6">line-numbered AsmError</text>
+
+    <rect x="40" y="232" width="230" height="78" rx="6" fill="#17191A" stroke="#2A2E2D"/>
+    <text x="56" y="256" font-size="14" fill="#EEEAE2">Program</text>
+    <text x="56" y="275" font-size="11" fill="#A3AAA6">code: Vec&lt;Instr&gt;  (8 B each)</text>
+    <text x="56" y="290" font-size="11" fill="#A3AAA6">data: Vec&lt;u8&gt;</text>
+    <text x="56" y="303" font-size="11" fill="#A3AAA6">.hy file: "HLYD" v1</text>
+
+    <rect x="40" y="338" width="230" height="64" rx="6" fill="#17191A" stroke="#2A2E2D"/>
+    <text x="56" y="362" font-size="14" fill="#EEEAE2">Vm::new(&amp;prog, Config)</text>
+    <text x="56" y="381" font-size="11" fill="#A3AAA6">memory 64 KiB · stack 1024</text>
+    <text x="56" y="395" font-size="11" fill="#A3AAA6">call depth 256 · seed · caps</text>
+
+    <rect x="40" y="430" width="230" height="44" rx="6" fill="none" stroke="#2A2E2D" stroke-dasharray="4 3"/>
+    <text x="56" y="450" font-size="11" fill="#A3AAA6">asm::disassemble → .hasm</text>
+    <text x="56" y="465" font-size="11" fill="#A3AAA6">halyard dis / debug</text>
+  </g>
+  <g stroke="#A3AAA6" stroke-width="1.4" fill="none">
+    <line x1="155" y1="112" x2="155" y2="138" marker-end="url(#a)"/>
+    <line x1="155" y1="204" x2="155" y2="230" marker-end="url(#a)"/>
+    <line x1="155" y1="310" x2="155" y2="336" marker-end="url(#a)"/>
+    <line x1="270" y1="370" x2="328" y2="370" marker-end="url(#a)"/>
+  </g>
+
+  <!-- EXECUTE: step loop -->
+  <rect x="330" y="56" width="520" height="418" rx="8" fill="none" stroke="#2A2E2D"/>
+  <g font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace">
+    <text x="350" y="84" font-size="14" fill="#EEEAE2">Vm::step()</text>
+    <text x="446" y="84" font-size="11" fill="#A3AAA6">— called by run(gas) / resume(gas)</text>
+
+    <rect x="350" y="100" width="148" height="56" rx="6" fill="#17191A" stroke="#2A2E2D"/>
+    <text x="364" y="124" font-size="13" fill="#EEEAE2">decode</text>
+    <text x="364" y="142" font-size="11" fill="#A3AAA6">Instr at pc</text>
+
+    <rect x="516" y="100" width="148" height="56" rx="6" fill="#17191A" stroke="#3FBF8A"/>
+    <text x="530" y="124" font-size="13" fill="#EEEAE2">charge gas</text>
+    <text x="530" y="142" font-size="11" fill="#A3AAA6">fixed cost per op</text>
+
+    <rect x="682" y="100" width="148" height="56" rx="6" fill="#17191A" stroke="#2A2E2D"/>
+    <text x="696" y="124" font-size="13" fill="#EEEAE2">execute</text>
+    <text x="696" y="142" font-size="11" fill="#A3AAA6">38 opcodes</text>
+  </g>
+  <g stroke="#A3AAA6" stroke-width="1.4" fill="none">
+    <line x1="498" y1="128" x2="514" y2="128" marker-end="url(#a)"/>
+    <line x1="664" y1="128" x2="680" y2="128" marker-end="url(#a)"/>
+  </g>
+
+  <!-- machine state -->
+  <g font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace">
+    <rect x="350" y="176" width="480" height="116" rx="6" fill="#17191A" stroke="#2A2E2D"/>
+    <text x="364" y="198" font-size="11" fill="#A3AAA6" letter-spacing="1">MACHINE STATE (Harvard: code is not in mem)</text>
+    <text x="364" y="222" font-size="12" fill="#EEEAE2">regs[16]: i64</text>
+    <text x="364" y="242" font-size="12" fill="#EEEAE2">pc: u32</text>
+    <text x="364" y="262" font-size="12" fill="#EEEAE2">gas_used: u64</text>
+    <text x="364" y="282" font-size="12" fill="#EEEAE2">rng: xorshift64*</text>
+    <text x="560" y="222" font-size="12" fill="#EEEAE2">mem: data @0 + bump heap</text>
+    <text x="560" y="242" font-size="12" fill="#EEEAE2">stack: Vec&lt;i64&gt; ≤ max_stack</text>
+    <text x="560" y="262" font-size="12" fill="#EEEAE2">calls: Vec&lt;u32&gt; ≤ depth</text>
+    <text x="560" y="282" font-size="12" fill="#EEEAE2">handler: Option&lt;u32&gt;</text>
+  </g>
+
+  <!-- traps -->
+  <g font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace">
+    <rect x="350" y="312" width="232" height="72" rx="6" fill="#17191A" stroke="#2A2E2D"/>
+    <text x="364" y="334" font-size="13" fill="#EEEAE2">raise(code)</text>
+    <text x="364" y="353" font-size="11" fill="#A3AAA6">div0 · mem OOB · stack · jump</text>
+    <text x="364" y="369" font-size="11" fill="#A3AAA6">illegal · cap denied · trap n</text>
+
+    <rect x="598" y="312" width="232" height="72" rx="6" fill="#17191A" stroke="#2A2E2D"/>
+    <text x="612" y="334" font-size="13" fill="#EEEAE2">seth handler (one-shot)</text>
+    <text x="612" y="353" font-size="11" fill="#A3AAA6">r0 = code, pc = handler</text>
+    <text x="612" y="369" font-size="11" fill="#A3AAA6">none armed → Trapped(code)</text>
+  </g>
+  <line x1="582" y1="348" x2="596" y2="348" stroke="#A3AAA6" stroke-width="1.4" marker-end="url(#a)"/>
+
+  <!-- status -->
+  <g font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace">
+    <rect x="350" y="404" width="480" height="54" rx="6" fill="#17191A" stroke="#2A2E2D"/>
+    <text x="364" y="426" font-size="12" fill="#A3AAA6">Status</text>
+    <text x="440" y="426" font-size="12" fill="#EEEAE2">Halted</text>
+    <text x="540" y="426" font-size="12" fill="#EEEAE2">OutOfGas</text>
+    <text x="650" y="426" font-size="12" fill="#EEEAE2">Trapped(code)</text>
+    <text x="364" y="446" font-size="11" fill="#A3AAA6">CLI exit</text>
+    <text x="440" y="446" font-size="11" fill="#A3AAA6">0</text>
+    <text x="540" y="446" font-size="11" fill="#A3AAA6">3 → resume(gas)</text>
+    <text x="650" y="446" font-size="11" fill="#A3AAA6">4</text>
+  </g>
+
+  <!-- SANDBOX column -->
+  <g font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace">
+    <rect x="900" y="56" width="260" height="236" rx="6" fill="#17191A" stroke="#2A2E2D"/>
+    <text x="916" y="80" font-size="14" fill="#EEEAE2">sys n  →  Cap check</text>
+    <text x="916" y="108" font-size="12" fill="#EEEAE2">write</text>
+    <text x="1010" y="108" font-size="12" fill="#3FBF8A">Output</text>
+    <text x="916" y="130" font-size="12" fill="#EEEAE2">read</text>
+    <text x="1010" y="130" font-size="12" fill="#3FBF8A">Input</text>
+    <text x="916" y="152" font-size="12" fill="#EEEAE2">emit</text>
+    <text x="1010" y="152" font-size="12" fill="#3FBF8A">Emit</text>
+    <text x="916" y="174" font-size="12" fill="#EEEAE2">host</text>
+    <text x="1010" y="174" font-size="12" fill="#3FBF8A">Host(id)</text>
+    <text x="916" y="196" font-size="12" fill="#EEEAE2">ticks</text>
+    <text x="1010" y="196" font-size="12" fill="#A3AAA6">— (= gas_used)</text>
+    <text x="916" y="218" font-size="12" fill="#EEEAE2">rand</text>
+    <text x="1010" y="218" font-size="12" fill="#A3AAA6">— (seeded)</text>
+    <line x1="916" y1="236" x2="1144" y2="236" stroke="#2A2E2D"/>
+    <text x="916" y="258" font-size="11" fill="#A3AAA6">missing cap → trap 7</text>
+    <text x="916" y="276" font-size="11" fill="#A3AAA6">register_host(id, HostFn)</text>
+
+    <rect x="900" y="312" width="260" height="72" rx="6" fill="#17191A" stroke="#2A2E2D"/>
+    <text x="916" y="334" font-size="13" fill="#EEEAE2">output · events</text>
+    <text x="916" y="353" font-size="11" fill="#A3AAA6">Vec&lt;u8&gt; / Vec&lt;Vec&lt;u8&gt;&gt;</text>
+    <text x="916" y="369" font-size="11" fill="#A3AAA6">read back by the host</text>
+
+    <rect x="900" y="404" width="260" height="70" rx="6" fill="#17191A" stroke="#2A2E2D"/>
+    <text x="916" y="426" font-size="13" fill="#EEEAE2">snapshot() / restore()</text>
+    <text x="916" y="445" font-size="11" fill="#A3AAA6">"HSNP" blob, resume elsewhere</text>
+    <text x="916" y="461" font-size="11" fill="#A3AAA6">state_hash(): FNV-1a of all</text>
+  </g>
+  <g stroke="#A3AAA6" stroke-width="1.4" fill="none">
+    <path d="M830 128 L860 128 L860 110 L898 110" marker-end="url(#a)"/>
+    <line x1="1030" y1="292" x2="1030" y2="310" marker-end="url(#a)"/>
+    <line x1="830" y1="430" x2="898" y2="430" marker-end="url(#a)"/>
+  </g>
+  <path d="M756 156 L756 166 L590 166 L590 174" stroke="#3FBF8A" stroke-width="1.2" fill="none" stroke-dasharray="3 3" marker-end="url(#g)"/>
+</svg>
